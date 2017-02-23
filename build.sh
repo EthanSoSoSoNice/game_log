@@ -1,0 +1,1 @@
+./rebar clean compile generate

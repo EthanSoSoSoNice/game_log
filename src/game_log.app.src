@@ -1,0 +1,15 @@
+{application, game_log,
+ [
+  {description, ""},
+  {vsn, "1"},
+  {registered, []},
+  {applications, [
+                  kernel,
+                  stdlib,
+                  crypto,
+                  sasl,
+                  emysql
+                 ]},
+  {mod, { game_log_app, []}},
+  {env, []}
+ ]}.

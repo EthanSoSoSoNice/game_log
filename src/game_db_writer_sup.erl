@@ -12,7 +12,7 @@
 
 %% API
 -export([
-  start_child/2,
+  start_child/1,
   start_link/0,
   stop/1
 ]).
@@ -31,6 +31,6 @@ init([]) ->
   {ok, {{simple_one_for_one, 5, 5}, [Children]}}.
 
 
-start_child(MQPid, DBRef) ->
-  supervisor:start_child(?MODULE, [MQPid, DBRef]).
+start_child(MQPid) ->
+  supervisor:start_child(?MODULE, [MQPid]).
 

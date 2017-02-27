@@ -10,6 +10,7 @@
 -author("11726").
 -behaviour(gen_server).
 -include("game_log.hrl").
+-include_lib("emysql/include/emysql.hrl").
 
 %% API
 -export([
@@ -66,10 +67,30 @@ terminate(_, _) ->
 
 insert_to_db(DBRef, Record) ->
   [Name|Values] = tuple_to_list(Record),
-  case game_log_db_mgr:fetch_prepare(Name) of
+  case fetch_prepare(Name) of
     undefined ->
-      game_log_db_mgr:prepare_sql(Name, length(Values));
+      prepare_sql(Name, length(Values));
     _ ->
       ok
   end,
-  game_log_db_mgr:execute_ok(DBRef, Name, Values).
+  execute_ok(DBRef, Name, Values).
+
+
+prepare_sql(Name, ValueCount) ->
+  Values = string:join(["?" || _ <- lists:seq(1, ValueCount)], ","),
+  PrepareSql = list_to_binary("insert into " ++ atom_to_list(Name) ++ "  value (" ++ Values ++ ");"),
+  emysql:prepare(Name, PrepareSql),
+  Name.
+
+fetch_prepare(Name) ->
+  emysql_statements:fetch(Name).
+
+
+-spec execute_ok(atom()|pid(), atom(), [any()])->ok | {error, any()}.
+execute_ok(DBRef, StmtName, Args)->
+  Ok = emysql:execute(DBRef, StmtName, Args),
+  case Ok of
+    #ok_packet{}->ok;
+    _->
+      error(Ok)
+  end.

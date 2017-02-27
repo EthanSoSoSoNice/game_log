@@ -24,7 +24,7 @@
   terminate/2
 ]).
 
--define(DB_CREATE(Name), <<"CREATE DATABASE IF EXIST ", (list_to_binary(Name))/binary, " DEFAULT CHARACTER SET UTF8 COLLATE UTF8_GENERAL_CI;">>).
+-define(DB_CREATE(Name), <<"CREATE DATABASE IF NOT EXISTS ", (list_to_binary(Name))/binary, " DEFAULT CHARACTER SET UTF8 COLLATE UTF8_GENERAL_CI;">>).
 
 -record(state, {
   ref :: pool_ref(),
@@ -125,7 +125,9 @@ start_db() ->
   Pwd = get_option(db_password, "111111"),
   Addr = get_option(db_addr, "192.168.1.35"),
   Port = get_option(db_port, 3306),
-  emysql:add_pool(Ref, PoolSize, User, Pwd, Addr, Port, DBName, utf8, [create_db_sql(DBName, SqlFile)]),
+  Sql = create_db_sql(DBName, SqlFile),
+  Cmds = binary:split(Sql, [<<";">>], [global]),
+  emysql:add_pool(Ref, PoolSize, User, Pwd, Addr, Port, undefined, utf8, [Cmd || Cmd <- Cmds, Cmd =/= <<>>]),
   Ref.
 
 database_name(Name) ->
@@ -136,7 +138,9 @@ database_name(Name) ->
 create_db_sql(DBName, SqlFile) ->
   {ok, SqlContent} = file:read_file(SqlFile),
   <<
-    (?DB_CREATE(database_name(DBName)))/binary,
+    (?DB_CREATE(DBName))/binary,
+    "\n",
+    "use ", (list_to_binary(DBName))/binary, ";",
     "\n",
     (SqlContent)/binary
   >>.

@@ -9,11 +9,11 @@
 -module(game_log_db_writer).
 -author("11726").
 -behaviour(gen_server).
--include_lib("emysql/include/emysql.hrl").
+-include("game_log.hrl").
 
 %% API
 -export([
-  start_link/2
+  start_link/1
 ]).
 
 %% gen_server callback
@@ -30,16 +30,16 @@
 %%% API
 %%%====================================
 
-start_link(MQPid, DBRef) ->
-  gen_server:start_link(?MODULE, [MQPid, DBRef], []).
+start_link(MQPid) ->
+  gen_server:start_link(?MODULE, [MQPid], []).
 
 
 %%%====================================
 %%% GenServer Callback
 %%%====================================
-init([MQPid, DBRef]) ->
+init([MQPid]) ->
   game_tiny_mq:listen(MQPid),
-  {ok, {MQPid, DBRef}}.
+  {ok, MQPid}.
 
 handle_call(_Msg, _From, State) ->
   {noreply, State}.
@@ -47,11 +47,11 @@ handle_call(_Msg, _From, State) ->
 handle_cast(_Msg, State) ->
   {noreply, State}.
 
-handle_info({tiny_mq_message, Msg}, {MQPid, DBRef} = State)
+handle_info({tiny_mq_message, Msg}, MQPid)
   when is_tuple(Msg)->
-  insert_to_db(DBRef, Msg),
+  insert_to_db(game_log_database:get_pool_ref(), Msg),
   game_tiny_mq:ack(MQPid),
-  {noreply, State};
+  {noreply, MQPid};
 handle_info({tiny_mq_message, _Msg}, {MQPid, _} = State) ->
   game_tiny_mq:ack(MQPid),
   {noreply, State};
@@ -66,30 +66,10 @@ terminate(_, _) ->
 
 insert_to_db(DBRef, Record) ->
   [Name|Values] = tuple_to_list(Record),
-  case fetch_prepare(Name) of
+  case game_log_db_mgr:fetch_prepare(Name) of
     undefined ->
-      prepare_sql(Name, length(Values));
+      game_log_db_mgr:prepare_sql(Name, length(Values));
     _ ->
       ok
   end,
-  execute_ok(DBRef, Name, Values).
-
-
-prepare_sql(Name, ValueCount) ->
-  Values = string:join(["?" || _ <- lists:seq(1, ValueCount)], ","),
-  PrepareSql = list_to_binary("insert into " ++ atom_to_list(Name) ++ "  value (" ++ Values ++ ");"),
-  emysql:prepare(Name, PrepareSql),
-  Name.
-
-fetch_prepare(Name) ->
-  emysql_statements:fetch(Name).
-
-
-  -spec execute_ok(atom()|pid(), atom(), [any()])->ok | {error, any()}.
-execute_ok(DBRef, StmtName, Args)->
-  Ok = emysql:execute(DBRef, StmtName, Args),
-  case Ok of
-    #ok_packet{}->ok;
-    _->
-      error(Ok)
-  end.
+  game_log_db_mgr:execute_ok(DBRef, Name, Values).

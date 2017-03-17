@@ -28,6 +28,11 @@
   mref
 }).
 
+-record(message, {
+  id,
+  msg
+}).
+
 -record(state, {
   free = [],
   busy = [],
@@ -144,14 +149,18 @@ handle_msg({ack, Consumer}, #state{ busy = BusyList, free = FreeList } = State) 
       push_message(State#state{ free = FreeList1, busy = BusyList1 })
   end;
 handle_msg({message, Msg}, #state{ free = [], msg_queue = MsgQueue, msg_count = MsgCount } = State) ->
+  NewCount = MsgCount + 1,
+  Message = #message{ id = generate_id(NewCount), msg = Msg },
   State#state{
-    msg_queue = queue:in(Msg, MsgQueue),
-    msg_count = MsgCount + 1
+    msg_queue = queue:in(Message, MsgQueue),
+    msg_count = NewCount
   };
 handle_msg({message, Msg}, #state{ free = _, msg_queue = MsgQueue, msg_count = MsgCount } = State) ->
+  NewCount = MsgCount + 1,
+  Message = #message{ id = generate_id(NewCount), msg = Msg },
   State1 = State#state{
-    msg_queue = queue:in(Msg, MsgQueue),
-    msg_count = MsgCount + 1
+    msg_queue = queue:in(Message, MsgQueue),
+    msg_count = NewCount
   },
   push_message(State1);
 handle_msg({listen, Consumer}, State) ->
@@ -212,12 +221,17 @@ do_listen(Consumer, State) ->
   State#state{ consumers = ConsumerList1, free = [Consumer|FreeList] }.
 
 do_push_message(Consumer, Message, State) ->
-  Consumer ! {tiny_mq_message, Message},
+  Consumer ! {tiny_mq_message, {Message#message.id, Message#message.msg}},
   Busy = State#state.busy,
   Busy1 = [{Consumer, Message}|Busy],
   State#state{ busy = Busy1 }.
 
 
+generate_id(Sequence) ->
+  <<
+    (timestamp()):32,
+    (integer_to_binary(Sequence)):32
+  >>.
 
 
 send_msg(Pid, Msg) ->

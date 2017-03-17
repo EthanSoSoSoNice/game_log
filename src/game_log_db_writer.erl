@@ -48,9 +48,9 @@ handle_call(_Msg, _From, State) ->
 handle_cast(_Msg, State) ->
   {noreply, State}.
 
-handle_info({tiny_mq_message, Msg}, MQPid)
+handle_info({tiny_mq_message, {Id, DBRecord} = Msg}, MQPid)
   when is_tuple(Msg)->
-  insert_to_db(game_log_database:get_pool_ref(), Msg),
+  insert_to_db(game_log_database:get_pool_ref(), setelement(2, DBRecord, Id)),
   game_tiny_mq:ack(MQPid),
   {noreply, MQPid};
 handle_info({tiny_mq_message, _Msg}, {MQPid, _} = State) ->

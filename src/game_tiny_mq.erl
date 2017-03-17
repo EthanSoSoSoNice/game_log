@@ -129,7 +129,7 @@ loop(State) ->
     {'mq_proto', Msg} ->
       case catch handle_msg(Msg, State) of
         {'EXIT', Error} ->
-          error_logger:error_msg("Error ~p~nMessage~p~nStccktrace", [Error, Msg, erlang:get_stacktrace()]),
+          error_logger:error_msg("Error ~p~nMessage~p~nStccktrace~p~n", [Error, Msg, erlang:get_stacktrace()]),
           exit(error);
         State1 ->
           loop(State1)
@@ -228,10 +228,11 @@ do_push_message(Consumer, Message, State) ->
 
 
 generate_id(Sequence) ->
-  <<
+  <<Id:64>> = <<
     (game_log_time:timestamp()):32,
-    (integer_to_binary(Sequence)):32
-  >>.
+    (Sequence):32
+  >>,
+  Id.
 
 
 send_msg(Pid, Msg) ->

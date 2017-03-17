@@ -229,7 +229,7 @@ do_push_message(Consumer, Message, State) ->
 
 generate_id(Sequence) ->
   <<
-    (timestamp()):32,
+    (game_log_time:timestamp()):32,
     (integer_to_binary(Sequence)):32
   >>.
 

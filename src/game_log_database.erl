@@ -132,8 +132,12 @@ start_db() ->
 
 database_name(Name) ->
   {{Y, M, D}, _} = calendar:local_time(),
-  Name ++ integer_to_list(Y) ++ integer_to_list(M) ++ integer_to_list(D).
+  Name ++ to_list(Y) ++ to_list(M) ++ to_list(D).
 
+to_list(N) when N < 10 ->
+  [$0, $0 + N];
+to_list(N) ->
+  integer_to_list(N).
 
 create_db_sql(DBName, SqlFile) ->
   {ok, SqlContent} = file:read_file(SqlFile),

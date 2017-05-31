@@ -1,5 +1,5 @@
 %%%-------------------------------------------------------------------
-%%% @author 11726
+%%% @author WangWeiNing
 %%% @copyright (C) 2017, <COMPANY>
 %%% @doc
 %%%
@@ -31,16 +31,15 @@
 %%% API
 %%%====================================
 
-start_link(MQPid) ->
-  gen_server:start_link(?MODULE, [MQPid], []).
+start_link(MQRef) ->
+  gen_server:start_link(?MODULE, [MQRef], []).
 
 
 %%%====================================
 %%% GenServer Callback
 %%%====================================
-init([MQPid]) ->
-  game_tiny_mq:listen(MQPid),
-  {ok, MQPid}.
+init([MQRef]) ->
+  {ok, MQRef}.
 
 handle_call(_Msg, _From, State) ->
   {noreply, State}.
@@ -48,13 +47,13 @@ handle_call(_Msg, _From, State) ->
 handle_cast(_Msg, State) ->
   {noreply, State}.
 
-handle_info({tiny_mq_message, {Id, DBRecord} = Msg}, MQPid)
+handle_info({game_log_message, {Id, DBRecord} = Msg}, MQRef)
   when is_tuple(Msg)->
   insert_to_db(game_log_database:get_pool_ref(), setelement(2, DBRecord, Id)),
-  game_tiny_mq:ack(MQPid),
-  {noreply, MQPid};
-handle_info({tiny_mq_message, _Msg}, {MQPid, _} = State) ->
-  game_tiny_mq:ack(MQPid),
+  game_log_mq:ack(MQRef),
+  {noreply, MQRef};
+handle_info({game_log_message, _Msg}, {MQRef, _} = State) ->
+  game_log_mq:ack(MQRef),
   {noreply, State};
 handle_info(_Msg, State) ->
   {noreply, State}.

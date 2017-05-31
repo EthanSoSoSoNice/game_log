@@ -1,5 +1,5 @@
 %%%-------------------------------------------------------------------
-%%% @author 11726
+%%% @author WangWeiNing
 %%% @copyright (C) 2017, <COMPANY>
 %%% @doc
 %%%
@@ -13,6 +13,14 @@
 %% API
 -export([start_link/2]).
 -type pool_ref() :: atom().
+-type database_option() ::
+{database_user, list()} |
+{database_pwd,  list()} |
+{database_poo_size, integer()} |
+{database_addr, list()} |
+{database_port, integer()} |
+{database_name, list()} |
+{database_encode, utf8 | latin1 | {utf8, utf8_unicode_ci} | {utf8, utf8_general_ci}}.
 
 %% gen_server callback
 -export([
@@ -36,8 +44,11 @@
 %%%===================================
 %%% API
 %%%===================================
+%% @doc
+%% Options :: [database_option()]
+%% @end
 start_link(SqlFile, Options)->
-  gen_server:start_link({local, ?MODULE}, ?MODULE, [SqlFile,Options], []).
+  gen_server:start_link({local, ?MODULE}, ?MODULE, [SqlFile, Options], []).
 
 -spec set_pool_ref(pool_ref()) -> ok.
 set_pool_ref(Ref) ->
@@ -53,12 +64,13 @@ get_pool_ref() ->
 
 init([SqlFile, Options]) ->
   ets:new(?MODULE, [named_table, public]),
-  DBName = proplists:get_value(db_name, Options, "game_log"),
-  POOL 	= proplists:get_value(db_pool_size, Options, 8),
-  UN 		= proplists:get_value(db_account, Options, "root"),
-  PW 		= proplists:get_value(db_password, Options, "111111"),
-  ADDR 	= proplists:get_value(db_addr, Options, "192.168.1.35"),
-  PORT 	= proplists:get_value(db_port, Options, 3306),
+  DBName = proplists:get_value(database_name, Options),
+  POOL 	= proplists:get_value(database_pool_size, Options, 8),
+  UN 		= proplists:get_value(database_user, Options),
+  PW 		= proplists:get_value(database_pwd, Options),
+  ADDR 	= proplists:get_value(database_addr, Options),
+  PORT 	= proplists:get_value(database_port, Options, 3306),
+  Encode = proplists:get_value(database_encode, Options, utf8),
   ets:insert(?MODULE, [
     {db_name, DBName},
     {db_pool_size, POOL},
@@ -66,10 +78,12 @@ init([SqlFile, Options]) ->
     {db_password, PW},
     {db_addr, ADDR},
     {db_port, PORT},
-    {db_sql_file, SqlFile}
+    {db_sql_file, SqlFile},
+    {db_encode, Encode}
   ]),
   Ref = start_db(),
   set_pool_ref(Ref),
+  start_refresh_timer(),
   {ok, #state{ ref = Ref }}.
 
 handle_call(_Msg, _From, State) ->
@@ -83,6 +97,7 @@ handle_info({timeout, _, refresh}, State) ->
   NewRef = start_db(),
   set_pool_ref(NewRef),
   start_clear_timer(),
+  start_refresh_timer(),
   {noreply, State#state{ old_ref = OldRef, ref = NewRef }};
 handle_info({timeout, _, clear_timeout}, State) ->
   case State#state.old_ref of
@@ -121,13 +136,14 @@ start_db() ->
   SqlFile = get_option(db_sql_file),
   Ref = list_to_atom(DBName),
   PoolSize = get_option(db_pool_size, 8),
-  User = get_option(db_account, "root"),
-  Pwd = get_option(db_password, "111111"),
-  Addr = get_option(db_addr, "192.168.1.35"),
+  User = get_option(db_account),
+  Pwd = get_option(db_password),
+  Addr = get_option(db_addr),
   Port = get_option(db_port, 3306),
   Sql = create_db_sql(DBName, SqlFile),
   Cmds = binary:split(Sql, [<<";">>], [global]),
-  emysql:add_pool(Ref, PoolSize, User, Pwd, Addr, Port, undefined, utf8, [Cmd || Cmd <- Cmds, Cmd =/= <<>>]),
+  Encode = get_option(db_encode),
+  emysql:add_pool(Ref, PoolSize, User, Pwd, Addr, Port, undefined, Encode, [Cmd || Cmd <- Cmds, Cmd =/= <<>>]),
   Ref.
 
 database_name(Name) ->

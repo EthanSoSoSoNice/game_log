@@ -1,4 +1,3 @@
-%%% Server time management process.
 -module(game_log_time).
 
 -export([
